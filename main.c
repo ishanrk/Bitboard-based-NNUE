@@ -1,119 +1,83 @@
-
-
-
-// system headers
 #include <stdio.h>
 #include <string.h>
-#ifdef WIN64
-#include <windows.h>
-#else
-# include <sys/time.h>
-#endif
+#include <stdint.h> // Include this for uint64_t
 
-// define bitboard data type
-#define U64 unsigned long long
+// FEN debug positions (positions citation: https://www.chessprogramming.org/Forsyth-Edwards_Notation)
+#define EMPTY_BOARD "8/8/8/8/8/8/8/8 b - - "
+#define START_POSITION "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 "
+#define TRICKY_POSITION "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 "
+#define KILLER_POSITION "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+#define CMK_POSITION "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
 
-// FEN debug positions ( positions citation: https://www.chessprogramming.org/Forsyth-Edwards_Notation)
-#define empty_board "8/8/8/8/8/8/8/8 b - - "
-#define start_position "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 "
-#define tricky_position "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 "
-#define killer_position "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
-#define cmk_position "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
+// Random number
+unsigned int random = 1829321383;
 
-// pseudo random number state
-unsigned int random_state = 1804289383;
-
-// generate 32-bit pseudo legal numbers
-unsigned int get_random_U32_number()
+// Generate 32-bit pseudo-legal numbers
+unsigned int random_num_32B()
 {
-    // get current state
-    unsigned int number = random_state;
+    unsigned int number = random;
 
-    // XOR shift algorithm
     number ^= number << 13;
     number ^= number >> 17;
     number ^= number << 5;
 
-    // update random number state
-    random_state = number;
-
-    // return random number
     return number;
 }
 
-// generate 64-bit pseudo legal numbers
-U64 get_random_U64_number()
+// Generate 64-bit random number
+uint64_t random_num_64B()
 {
-    // define 4 random numbers
-    U64 n1, n2, n3, n4;
+    // Define 4 random numbers
+    uint64_t n1, n2, n3, n4;
 
-    // init random numbers slicing 16 bits from MS1B side
-    n1 = (U64)(get_random_U32_number()) & 0xFFFF;
-    n2 = (U64)(get_random_U32_number()) & 0xFFFF;
-    n3 = (U64)(get_random_U32_number()) & 0xFFFF;
-    n4 = (U64)(get_random_U32_number()) & 0xFFFF;
+    // Initialize random numbers by slicing 16 bits from the MSB side
+    n1 = (uint64_t)(random_num_32B()) & 0xFFFF;
+    n2 = (uint64_t)(random_num_32B()) & 0xFFFF;
+    n3 = (uint64_t)(random_num_32B()) & 0xFFFF;
+    n4 = (uint64_t)(random_num_32B()) & 0xFFFF;
 
-    // return random number
+    // Combine the 4 numbers to form a 64-bit random number
     return n1 | (n2 << 16) | (n3 << 32) | (n4 << 48);
 }
+constexpr int MAX_SIZE = 7;
 
-// generate magic number candidate
-U64 generate_magic_number()
-{
-    return get_random_U64_number() & get_random_U64_number() & get_random_U64_number();
-}
+// Custom type for bitboard (64-bit unsigned integer)
+using ChessBitboard = unsigned long long;
 
-
-/**********************************\
- ==================================
-
-          Bit manipulations
-
- ==================================
-\**********************************/
-
-// set/get/pop bit macros
+// Set a bit in the bitboard
 #define set_bit(bitboard, square) ((bitboard) |= (1ULL << (square)))
+
+// Get a bit from the bitboard
 #define get_bit(bitboard, square) ((bitboard) & (1ULL << (square)))
-#define pop_bit(bitboard, square) ((bitboard) &= ~(1ULL << (square)))
 
-// count bits within a bitboard (Brian Kernighan's way)
-static inline int count_bits(U64 bitboard)
+// Pop a bit from the bitboard
+#define clear_bit(bitboard, square) ((bitboard) &= ~(1ULL << (square)))
+
+// Count bits within a bitboard (Brian Kernighan's way)
+static inline int count_set_bits(ChessBitboard bitboard)
 {
-    // bit counter
     int count = 0;
-
-    // consecutively reset least significant 1st bit
     while (bitboard)
     {
-        // increment count
         count++;
-
-        // reset least significant 1st bit
         bitboard &= bitboard - 1;
     }
-
-    // return bit count
     return count;
 }
 
-// get least significant 1st bit index
-static inline int get_ls1b_index(U64 bitboard)
+// Get the index of the least significant 1st bit
+static inline int get_least_significant_bit_index(ChessBitboard bitboard)
 {
-    // make sure bitboard is not 0
     if (bitboard)
     {
-        // count trailing bits before LS1B
-        return count_bits((bitboard & -bitboard) - 1);
+        return count_set_bits((bitboard & -bitboard) - 1);
     }
-
-        //otherwise
     else
-        // return illegal index
+    {
+        // Return an illegal index
         return -1;
+    }
 }
-
-
 /**********************************\
  ==================================
 
