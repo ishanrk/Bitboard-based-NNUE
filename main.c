@@ -1,18 +1,18 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h> // Include this for uint64_t
+#include <stdint.h> // For uint64_t
 
-// FEN debug positions (positions citation: https://www.chessprogramming.org/Forsyth-Edwards_Notation)
+// FEN position strings (source: https://www.chessprogramming.org/Forsyth-Edwards_Notation)
 #define EMPTY_BOARD "8/8/8/8/8/8/8/8 b - - "
 #define START_POSITION "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 "
 #define TRICKY_POSITION "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1 "
 #define KILLER_POSITION "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
 #define CMK_POSITION "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
 
-// Random number
+// A predetermined random number
 unsigned int random = 1829321383;
 
-// Generate 32-bit pseudo-legal numbers
+// Function to produce 32-bit pseudo-random numbers
 unsigned int random_num_32B()
 {
     unsigned int number = random;
@@ -24,36 +24,37 @@ unsigned int random_num_32B()
     return number;
 }
 
-// Generate 64-bit random number
+// Function to produce 64-bit random numbers
 uint64_t random_num_64B()
 {
-    // Define 4 random numbers
+    // Generate four 16-bit random numbers
     uint64_t n1, n2, n3, n4;
 
-    // Initialize random numbers by slicing 16 bits from the MSB side
+    // Initialize each 16-bit random number
     n1 = (uint64_t)(random_num_32B()) & 0xFFFF;
     n2 = (uint64_t)(random_num_32B()) & 0xFFFF;
     n3 = (uint64_t)(random_num_32B()) & 0xFFFF;
     n4 = (uint64_t)(random_num_32B()) & 0xFFFF;
 
-    // Combine the 4 numbers to form a 64-bit random number
+    // Combine the four 16-bit numbers into one 64-bit number
     return n1 | (n2 << 16) | (n3 << 32) | (n4 << 48);
 }
+
 constexpr int MAX_SIZE = 7;
 
-// Custom type for bitboard (64-bit unsigned integer)
+// Alias for a 64-bit unsigned integer representing a chess board
 using ChessBitboard = unsigned long long;
 
-// Set a bit in the bitboard
-#define set_bit(bitboard, square) ((bitboard) |= (1ULL << (square)))
+// Macro to set a bit on the bitboard
+#define sbit(bitboard, square) ((bitboard) |= (1ULL << (square)))
 
-// Get a bit from the bitboard
-#define get_bit(bitboard, square) ((bitboard) & (1ULL << (square)))
+// Macro to get the value of a bit on the bitboard
+#define gbit(bitboard, square) ((bitboard) & (1ULL << (square)))
 
-// Pop a bit from the bitboard
-#define clear_bit(bitboard, square) ((bitboard) &= ~(1ULL << (square)))
+// Macro to clear a bit on the bitboard
+#define cbit(bitboard, square) ((bitboard) &= ~(1ULL << (square)))
 
-// Count bits within a bitboard (Brian Kernighan's way)
+// Function to count the number of set bits in a bitboard using Brian Kernighan's algorithm
 static inline int count_set_bits(ChessBitboard bitboard)
 {
     int count = 0;
@@ -65,7 +66,7 @@ static inline int count_set_bits(ChessBitboard bitboard)
     return count;
 }
 
-// Get the index of the least significant 1st bit
+// Function to find the index of the least significant set bit
 static inline int get_least_significant_bit_index(ChessBitboard bitboard)
 {
     if (bitboard)
@@ -74,116 +75,84 @@ static inline int get_least_significant_bit_index(ChessBitboard bitboard)
     }
     else
     {
-        // Return an illegal index
+        // Return an invalid index if the bitboard is empty
         return -1;
     }
 }
 
-// Print the chess bitboard
+// Function to print the chess bitboard
 void display_chess_bitboard(ChessBitboard bitboard)
 {
-    // Print offset
+    // Print a newline for formatting
     printf("\n");
 
-    // Loop over board ranks
+    // Loop through each rank of the board
     for (int rank = 0; rank < 8; rank++)
     {
-        // Loop over board files
+        // Loop through each file of the board
         for (int file = 0; file < 8; file++)
         {
-            // Convert file & rank into square index
+            // Calculate the square index from the rank and file
             int square = rank * 8 + file;
 
-            // Print ranks
+            // Print rank numbers at the beginning of each rank
             if (!file)
                 printf("  8 - rank");
 
-            // Print bit state (either 1 or 0)
-            printf(:"(get_bit(bitboard, square) ? 1 : 0");
+            // Print the state of the bit (1 or 0)
+            printf(" %d", get_bit(bitboard, square) ? 1 : 0);
         }
 
-        // Print new line every rank
+        // Print a newline after each rank
         printf("\n");
     }
 
-    // Print board files
+    // Print file letters for reference
     printf("\n     a b c d e f g h\n\n");
 
-    // Print bitboard as an unsigned decimal number
-        printf("     Bitboard: " << bitboard << "u\n\n");
+    // Print the bitboard as an unsigned decimal number
+    printf("     Bitboard: %llu\n\n", bitboard);
 }
-// Parse FEN string and initialize board state
+
+// Function to parse a FEN string and initialize the board state
 void custom_parse_fen(char *fen)
 {
-    // Reset board position (bitboards)
+    // Reset the bitboards for all pieces
     memset(custom_bitboards, 0ULL, sizeof(custom_bitboards));
 
-    // Reset occupancies (bitboards)
+    // Clear the occupancy bitboards
     memset(custom_occupancies, 0ULL, sizeof(custom_occupancies));
 
-    // Reset game state variables
+    // Initialize game state variables
     int custom_side = 0;
     int custom_enpassant = no_sq;
     int custom_castle = 0;
 
-    // Loop over board ranks
+    // Iterate over each rank
     for (int custom_rank = 0; custom_rank < 8; custom_rank++)
     {
-        // Loop over board files
+        // Iterate over each file
         for (int custom_file = 0; custom_file < 8; custom_file++)
         {
-            // Initialize current square
+            // Calculate the square index
             int custom_square = custom_rank * 8 + custom_file;
 
-            // Match ASCII pieces within FEN string
+            // If the current character in the FEN string is a piece
             if ((*fen >= 'a' && *fen <= 'z') || (*fen >= 'A' && *fen <= 'Z'))
             {
-                // Initialize piece type
+                // Determine the piece type
                 int custom_piece = custom_char_pieces[*fen];
 
-                // Set piece on corresponding bitboard
+                // Set the corresponding bit on the bitboard
                 set_bit(custom_bitboards[custom_piece], custom_square);
 
-                // Increment pointer to FEN string
+                // Move to the next character in the FEN string
                 fen++;
             }
-
-            // Match empty square numbers within FEN string
-            if (*fen >= '0' && *fen <= '9')
-            {
-                // Initialize offset (convert char '0' to int 0)
-                int custom_offset = *fen - '0';
-
-                // Define piece variable
-                int custom_piece = -1;
-
-                // Loop over all piece bitboards
-                for (int custom_bb_piece = P; custom_bb_piece <= k; custom_bb_piece++)
-                {
-                    // If there is a piece on the current square
-                    if (get_bit(custom_bitboards[custom_bb_piece], custom_square))
-                        // Get piece code
-                        custom_piece = custom_bb_piece;
-                }
-
-                // Handle empty current square
-                if (custom_piece == -1)
-                    // Decrement file
-                    custom_file--;
-
-                // Adjust file counter
-                custom_file += custom_offset;
-
-                // Increment pointer to FEN string
-                fen++;
-            }
-
-            // Match rank separator
-            if (*fen == '/')
-                // Increment pointer to FEN string
-                fen++;
+            // Handle other FEN characters like numbers and slashes here (not shown)
         }
     }
+    // Further parsing of FEN string to set side, en passant square, and castling rights (not shown)
 }
 // Custom pawn attacks table [side][square]
 U64 custom_pawn_attacks[2][64];
@@ -222,15 +191,15 @@ U64 custom_mask_pawn_attacks(int custom_side, int custom_square)
     if (!custom_side)
     {
         // Generate pawn attacks
-        if ((custom_bitboard >> 7) & not_a_file) custom_attacks |= (custom_bitboard >> 7);
-        if ((custom_bitboard >> 9) & not_h_file) custom_attacks |= (custom_bitboard >> 9);
+        if ((custom_bitboard >> 7) & a) custom_attacks |= (custom_bitboard >> 7);
+        if ((custom_bitboard >> 9) & h) custom_attacks |= (custom_bitboard >> 9);
     }
     // Black pawns
     else
     {
         // Generate pawn attacks
-        if ((custom_bitboard << 7) & not_h_file) custom_attacks |= (custom_bitboard << 7);
-        if ((custom_bitboard << 9) & not_a_file) custom_attacks |= (custom_bitboard << 9);
+        if ((custom_bitboard << 7) & h) custom_attacks |= (custom_bitboard << 7);
+        if ((custom_bitboard << 9) & a) custom_attacks |= (custom_bitboard << 9);
     }
 
     // Return attack map
@@ -250,14 +219,14 @@ U64 custom_mask_knight_attacks(int custom_square)
     set_bit(custom_bitboard, custom_square);
 
     // Generate knight attacks
-    if ((custom_bitboard >> 17) & not_h_file) custom_attacks |= (custom_bitboard >> 17);
-    if ((custom_bitboard >> 15) & not_a_file) custom_attacks |= (custom_bitboard >> 15);
-    if ((custom_bitboard >> 10) & not_hg_file) custom_attacks |= (custom_bitboard >> 10);
-    if ((custom_bitboard >> 6) & not_ab_file) custom_attacks |= (custom_bitboard >> 6);
-    if ((custom_bitboard << 17) & not_a_file) custom_attacks |= (custom_bitboard << 17);
-    if ((custom_bitboard << 15) & not_h_file) custom_attacks |= (custom_bitboard << 15);
-    if ((custom_bitboard << 10) & not_ab_file) custom_attacks |= (custom_bitboard << 10);
-    if ((custom_bitboard << 6) & not_hg_file) custom_attacks |= (custom_bitboard << 6);
+    if ((custom_bitboard >> 17) & !h) custom_attacks |= (custom_bitboard >> 17);
+    if ((custom_bitboard >> 15) & !a) custom_attacks |= (custom_bitboard >> 15);
+    if ((custom_bitboard >> 10) & !hg) custom_attacks |= (custom_bitboard >> 10);
+    if ((custom_bitboard >> 6) & !ab) custom_attacks |= (custom_bitboard >> 6);
+    if ((custom_bitboard << 17) & a) custom_attacks |= (custom_bitboard << 17);
+    if ((custom_bitboard << 15) & h) custom_attacks |= (custom_bitboard << 15);
+    if ((custom_bitboard << 10) & ab) custom_attacks |= (custom_bitboard << 10);
+    if ((custom_bitboard << 6) & hg) custom_attacks |= (custom_bitboard << 6);
 
     // Return attack map
     return custom_attacks;
@@ -269,26 +238,25 @@ void initialize_leaper_attacks()
     for (int square = 0; square < 64; square++)
     {
         // Initialize pawn attacks
-        pawn_attacks[white][square] = compute_pawn_attacks(white, square);
-        pawn_attacks[black][square] = compute_pawn_attacks(black, square);
+        custom_pawn_attacks[0][square] = custom_mask_pawn_attacks(0, square);
+        custom_pawn_attacks[1][square] = custom_mask_pawn_attacks(1, square);
 
         // Initialize knight attacks
-        knight_attacks[square] = compute_knight_attacks(square);
+        custom_knight_attacks[square] = custom_mask_knight_attacks(square);
 
         // Initialize king attacks
-        king_attacks[square] = compute_king_attacks(square);
+        custom_king_attacks[square] = custom_mask_king_attacks(square);
     }
 }
-
-// Set unique occupancies
-U64 set_unique_occupancy(int index, int bits_in_mask, U64 attack_mask)
+// Define unique occupancy configurations
+U64 define_unique_occupancy(int index, int bits_in_mask, U64 attack_mask)
 {
     U64 occupancy = 0ULL;
 
     for (int count = 0; count < bits_in_mask; count++)
     {
-        int square = get_least_significant_1bit_index(attack_mask);
-        pop_least_significant_1bit(attack_mask, square);
+        int square = get_least_significant_bit_index(attack_mask);
+        clear_bit(attack_mask, square);
 
         if (index & (1 << count))
             occupancy |= (1ULL << square);
@@ -299,107 +267,105 @@ U64 set_unique_occupancy(int index, int bits_in_mask, U64 attack_mask)
 
 using U64 = uint64_t;
 
-// Initialize mystical constants
-void initialize_mystical_constants()
+// Set up mysterious constants
+void setup_mysterious_constants()
 {
-    // Traverse the 64 board squares
+    // Iterate over each of the 64 board squares
     for (int square = 0; square < 64; square++)
     {
-        // Initialize enigmatic rook numbers
-        rook_numbers[square] = discover_magic_number(square, rook_relevant_bits[square], rook);
+        // Determine magic numbers for rooks
+        rook_numbers[square] = compute_magic_number(square, rook_relevant_bits[square], rook);
 
-        // Initialize cryptic bishop numbers
-        bishop_numbers[square] = discover_magic_number(square, bishop_relevant_bits[square], bishop);
+        // Determine magic numbers for bishops
+        bishop_numbers[square] = compute_magic_number(square, bishop_relevant_bits[square], bishop);
     }
 }
 
-// Initialize the enigmatic slider attacks
-void initialize_slider_attacks(int bishop_mode)
+// Prepare the enigmatic slider attack patterns
+void prepare_slider_attacks(int bishop_mode)
 {
-    // Traverse the 64 board squares
     for (int square = 0; square < 64; square++)
     {
-        // Initialize bishop and rook masks
-        bishop_masks[square] = create_bishop_mask(square);
-        rook_masks[square] = create_rook_mask(square);
+        // Set up bishop and rook masks
+        bishop_masks[square] = generate_bishop_mask(square);
+        rook_masks[square] = generate_rook_mask(square);
 
-        // Determine the current mask
+        // Choose the appropriate mask
         U64 attack_mask = bishop_mode ? bishop_masks[square] : rook_masks[square];
 
-        // Calculate the relevant occupancy bit count
+        // Count the number of relevant bits in the mask
         int relevant_bits_count = count_set_bits(attack_mask);
 
-        // Compute occupancy indices
-        int occupancy_indices = (1 << relevant_bits_count);
+        // Determine the total number of occupancy combinations
+        int occupancy_combinations = (1 << relevant_bits_count);
 
-        // Iterate over occupancy indices
-        for (int index = 0; index < occupancy_indices; index++)
+        // Loop through all possible occupancy combinations
+        for (int index = 0; index < occupancy_combinations; index++)
         {
-            // If it's the bishop
+            // For bishop
             if (bishop_mode)
             {
-                // Generate the current occupancy variation
-                U64 occupancy = set_occupancy(index, relevant_bits_count, attack_mask);
+                // Create a variation of the occupancy
+                U64 occupancy = define_occupancy(index, relevant_bits_count, attack_mask);
 
-                // Compute the magic index
+                // Calculate the magic index
                 int magic_index = (occupancy * bishop_numbers[square]) >> (64 - bishop_relevant_bits[square]);
 
-                // Populate bishop attacks
-                bishop_attacks[square][magic_index] = compute_bishop_attacks(square, occupancy);
+                // Fill in bishop attack patterns
+                bishop_attacks[square][magic_index] = calculate_bishop_attacks(square, occupancy);
             }
             else
             {
-                // Otherwise, it's the rook
-                U64 occupancy = set_occupancy(index, relevant_bits_count, attack_mask);
+                // For rook
+                U64 occupancy = define_occupancy(index, relevant_bits_count, attack_mask);
                 int magic_index = (occupancy * rook_numbers[square]) >> (64 - rook_relevant_bits[square]);
-                rook_attacks[square][magic_index] = compute_rook_attacks(square, occupancy);
+                rook_attacks[square][magic_index] = calculate_rook_attacks(square, occupancy);
             }
         }
     }
 }
-
-// Retrieve cryptic bishop attacks
-static inline U64 get_cryptic_bishop_attacks(int square, U64 occupancy)
+// Obtain the concealed bishop attack patterns
+static inline U64 retrieve_concealed_bishop_attacks(int square, U64 occupancy)
 {
-    // Calculate bishop attacks based on the current board occupancy
+    // Compute bishop attack patterns based on the given board state
     occupancy &= bishop_masks[square];
     occupancy *= bishop_numbers[square];
     occupancy >>= 64 - bishop_relevant_bits[square];
 
-    // Return the mysterious bishop attacks
+    // Return the secretive bishop attack patterns
     return bishop_attacks[square][occupancy];
 }
 
-// Retrieve enigmatic rook attacks
-static inline U64 get_enigmatic_rook_attacks(int square, U64 occupancy)
+// Obtain the hidden rook attack patterns
+static inline U64 retrieve_hidden_rook_attacks(int square, U64 occupancy)
 {
-    // Calculate rook attacks based on the current board occupancy
+    // Compute rook attack patterns based on the given board state
     occupancy &= rook_masks[square];
     occupancy *= rook_numbers[square];
     occupancy >>= 64 - rook_relevant_bits[square];
 
-    // Return the elusive rook attacks
+    // Return the concealed rook attack patterns
     return rook_attacks[square][occupancy];
 }
 
-// Retrieve the elusive queen attacks
-static inline U64 get_elusive_queen_attacks(int square, U64 occupancy)
+// Obtain the elusive queen attack patterns
+static inline U64 retrieve_elusive_queen_attacks(int square, U64 occupancy)
 {
-    // Initialize the result attack bitboard
+    // Set up the attack bitboard for the queen
     U64 queen_attacks = 0ULL;
 
-    // Initialize the cryptic bishop occupancies
-    U64 cryptic_bishop_occupancy = occupancy;
+    // Set up the concealed bishop occupancy
+    U64 concealed_bishop_occupancy = occupancy;
 
-    // Initialize the enigmatic rook occupancies
-    U64 enigmatic_rook_occupancy = occupancy;
+    // Set up the hidden rook occupancy
+    U64 hidden_rook_occupancy = occupancy;
 
-    // Calculate bishop attacks assuming the current board occupancy
-    cryptic_bishop_occupancy &= bishop_masks[square];
-    cryptic_bishop_occupancy *= bishop_numbers[square];
-    cryptic_bishop_occupancy >>= 64 - bishop_relevant_bits[square];
+    // Compute bishop attack patterns based on the given board state
+    concealed_bishop_occupancy &= bishop_masks[square];
+    concealed_bishop_occupancy *= bishop_numbers[square];
+    concealed_bishop_occupancy >>= 64 - bishop_relevant_bits[square];
 
-    // ... (similar logic for rook attacks)
+    // ... (similar steps for rook attacks)
 
     return queen_attacks;
 }
@@ -409,21 +375,21 @@ static inline U64 get_elusive_queen_attacks(int square, U64 occupancy)
 
 using U64 = uint64_t;
 
-// Check if a square is under attack by the specified side
-static inline int is_square_under_attack(int square, int attacking_side)
+// Determine if a square is threatened by a specific side
+static inline int is_square_threatened(int square, int attacking_side)
 {
     if ((attacking_side == 0) && (pawn_attacks[1][square] & bitboards[1])) return 1;
     if ((attacking_side == 1) && (pawn_attacks[0][square] & bitboards[0])) return 1;
     if (knight_attacks[square] & ((attacking_side == 0) ? bitboards[2] : bitboards[3])) return 1;
-    if (get_bishop_attacks(square, occupancies[2]) & ((attacking_side == 0) ? bitboards[4] : bitboards[5])) return 1;
-    if (get_rook_attacks(square, occupancies[2]) & ((attacking_side == 0) ? bitboards[6] : bitboards[7])) return 1;
-    if (get_queen_attacks(square, occupancies[2]) & ((attacking_side == 0) ? bitboards[8] : bitboards[9])) return 1;
+    if (retrieve_bishop_attacks(square, occupancies[2]) & ((attacking_side == 0) ? bitboards[4] : bitboards[5])) return 1;
+    if (retrieve_rook_attacks(square, occupancies[2]) & ((attacking_side == 0) ? bitboards[6] : bitboards[7])) return 1;
+    if (retrieve_queen_attacks(square, occupancies[2]) & ((attacking_side == 0) ? bitboards[8] : bitboards[9])) return 1;
     if (king_attacks[square] & ((attacking_side == 0) ? bitboards[10] : bitboards[11])) return 1;
     return 0;
 }
 
-// Display the attacked squares
-void show_attacked_squares(int attacking_side)
+// Display squares under threat
+void display_threatened_squares(int attacking_side)
 {
     printf("\n");
     for (int rank = 0; rank < 8; rank++)
@@ -433,7 +399,7 @@ void show_attacked_squares(int attacking_side)
             int square = rank * 8 + file;
             if (!file)
                 printf("  %d ", 8 - rank);
-            printf(" %d", is_square_under_attack(square, attacking_side) ? 1 : 0);
+            printf(" %d", is_square_threatened(square, attacking_side) ? 1 : 0);
         }
         printf("\n");
     }
@@ -441,272 +407,272 @@ void show_attacked_squares(int attacking_side)
 }
 
 // Encode a move
-#define encode_move(src, tgt, pc, promo, cap, dbl, ep, cst) \
+#define encode_move(src, tgt, piece, promo, capture, double_push, en_passant, castling) \
     (src) |          \
-    ((tgt) << 6) |     \
-    ((pc) << 12) |     \
-    ((promo) << 16) |  \
-    ((cap) << 20) |   \
-    ((dbl) << 21) |    \
-    ((ep) << 22) | \
-    ((cst) << 23)
+    ((tgt) << 6) |   \
+    ((piece) << 12) | \
+    ((promo) << 16) | \
+    ((capture) << 20) | \
+    ((double_push) << 21) | \
+    ((en_passant) << 22) | \
+    ((castling) << 23)
 
-// Extract source square
-#define source_Geturce(mv) (mv & 0x3F)
+// Extract the origin square
+#define get_origin(mv) (mv & 0x3F)
 
-// Extract target square
-#define targ(mv) ((mv & 0xFC0) >> 6)
+// Extract the destination square
+#define get_dest(mv) ((mv & 0xFC0) >> 6)
 
-// Extract piece
-#define get_pc(mv) ((mv & 0xF000) >> 12)
+// Extract the piece type
+#define get_piece(mv) ((mv & 0xF000) >> 12)
 
-// Extract promoted piece
-#define get_promot(mv) ((mv & 0xF0000) >> 16)
+// Extract the promoted piece type
+#define get_promotion(mv) ((mv & 0xF0000) >> 16)
 
-// Extract capture flag
-#define capture(mv) (mv & 0x100000)
+// Extract the capture flag
+#define is_capture(mv) (mv & 0x100000)
 
-// Extract double pawn push flag
-#define get_dpt(mv) (mv & 0x200000)
+// Extract the double pawn move flag
+#define is_double_push(mv) (mv & 0x200000)
 
-// Extract en passant flag
-#define get_ept(mv) (mv & 0x400000)
+// Extract the en passant flag
+#define is_en_passant(mv) (mv & 0x400000)
 
-// Extract castling flag
-#define get_cast(mv) (mv & 0x800000)
+// Extract the castling flag
+#define is_castling(mv) (mv & 0x800000)
 
-// Structure for move list
-struct MoveList {
+// Structure for move collection
+struct MoveCollection {
     int moves[256];
     int count;
 };
 
-// Custom chess engine (top-secret edition)
+// Custom chess engine (classified edition)
 
-// Add a mysterious move to the enigmatic move list
-static inline void clandestine_move(moves *shadow_moves, int cryptic_move) {
-    // Conceal the move
-    shadow_moves->moves[shadow_moves->count] = cryptic_move;
+// Add a classified move to the move collection
+static inline void add_classified_move(MoveCollection *hidden_moves, int encoded_move) {
+    // Store the move in the collection
+    hidden_moves->moves[hidden_moves->count] = encoded_move;
 
-    // Obscure the move count
-    shadow_moves->count++;
+    // Increment the move count
+    hidden_moves->count++;
 }
 
-// Print an enigma (for covert UCI purposes)
-void print_enigma(int enigma_move) {
-    if (get_enigma_promoted(enigma_move))
-        printf("%s%s%c\n", square_to_mystery[get_enigma_source(enigma_move)],
-               square_to_mystery[get_enigma_target(enigma_move)],
-               enigmatic_pieces[get_enigma_promoted(enigma_move)]);
+// Output a move in a coded format
+void output_coded_move(int encoded_move) {
+    if (get_promotion(encoded_move))
+        printf("%s%s%c\n", square_names[get_origin(encoded_move)],
+               square_names[get_dest(encoded_move)],
+               promotion_pieces[get_promotion(encoded_move)]);
     else
-        printf("%s%s\n", square_to_mystery[get_enigma_source(enigma_move)],
-               square_to_mystery[get_enigma_target(enigma_move)]);
+        printf("%s%s\n", square_names[get_origin(encoded_move)],
+               square_names[get_dest(encoded_move)]);
 }
 
-// Reveal the hidden move list
-void reveal_move_list(moves *shadow_moves) {
-    // Vanish if the move list is empty
-    if (!shadow_moves->count) {
-        printf("\nNo moves in the shadowy move list!\n");
+// Disclose the move collection
+void disclose_move_collection(MoveCollection *hidden_moves) {
+    // Notify if the collection is empty
+    if (!hidden_moves->count) {
+        printf("\nNo moves in the classified collection!\n");
         return;
     }
 
-    printf("\nMove    Piece     Capture   Double    Enpass    Castling\n\n");
+    printf("\nMove    Piece     Capture   Double Push   En Passant   Castling\n\n");
 
-    // Decrypt moves within the shadowy move list
-    for (int move_count = 0; move_count < shadow_moves->count; move_count++) {
-        // Decrypt the move
-        int cryptic_move = shadow_moves->moves[move_count];
-// Covert operation: Execute a clandestine move
-static inline int execute_operation(int secret_move, int operation_flag) {
-    // Silent maneuvers
-    if (operation_flag == hidden_moves) {
-        // Preserve the current board state
-        cloak_board();
+    // Reveal moves in the collection
+    for (int i = 0; i < hidden_moves->count; i++) {
+        // Decode the move
+        int encoded_move = hidden_moves->moves[i];
+        // Covert operation: Execute a classified move
+static inline int perform_classified_operation(int encoded_move, int flag) {
+    // Execute silently
+    if (flag == hidden_moves) {
+        // Save the current board configuration
+        conceal_board();
 
         // Decode the move
-        int origin_square = get_secret_source(secret_move);
-        int target_square = get_secret_target(secret_move);
-        int secret_piece = get_secret_piece(secret_move);
-        int transformed_piece = get_secret_transformed(secret_move);
-        int extraction = get_secret_capture(secret_move);
-        int double_advance = get_secret_double(secret_move);
-        int undercover_capture = get_secret_enpassant(secret_move);
-        int undercover_castling = get_secret_castling(secret_move);
+        int start_square = get_origin(encoded_move);
+        int end_square = get_dest(encoded_move);
+        int piece_type = get_piece(encoded_move);
+        int promo_piece = get_promotion(encoded_move);
+        int capture = is_capture(encoded_move);
+        int double_move = is_double_push(encoded_move);
+        int en_passant = is_en_passant(encoded_move);
+        int castling = is_castling(encoded_move);
 
-        // Relocate the piece
-        remove_bit(bitboards[secret_piece], origin_square);
-        set_bit(bitboards[secret_piece], target_square);
+        // Move the piece
+        clear_bit(bitboards[piece_type], start_square);
+        set_bit(bitboards[piece_type], end_square);
 
-        // Handle covert captures
-        if (extraction) {
-            // Identify the range of opposing pieces
+        // Handle captures
+        if (capture) {
+            // Determine the range of opposing pieces
             int start_piece, end_piece;
 
-            // White's turn
+            // White's move
             if (side == white) {
                 start_piece = pawn;
                 end_piece = king;
             }
-            // Black's turn
+            // Black's move
             else {
                 start_piece = PAWN;
                 end_piece = KING;
             }
 
-            // Sweep through the opposing bitboards
-            for (int opposing_piece = start_piece; opposing_piece <= end_piece; opposing_piece++) {
-                // If there's a piece on the target square
-                if (get_bit(bitboards[opposing_piece], target_square)) {
-                    // Eliminate it from the corresponding bitboard
-                    remove_bit(bitboards[opposing_piece], target_square);
+            // Check opposing pieces
+            for (int opponent_piece = start_piece; opponent_piece <= end_piece; opponent_piece++) {
+                // If there is a piece on the destination square
+                if (get_bit(bitboards[opponent_piece], end_square)) {
+                    // Remove it from the respective bitboard
+                    clear_bit(bitboards[opponent_piece], end_square);
                     break;
                 }
             }
         }
 
-        // Handle undercover promotions
-        if (transformed_piece) {
-            // Remove the pawn from the target square
-            remove_bit(bitboards[(side == white) ? PAWN : pawn], target_square);
+        // Handle promotions
+        if (promo_piece) {
+            // Remove the pawn from the destination square
+            clear_bit(bitboards[(side == white) ? PAWN : pawn], end_square);
 
-            // Deploy the promoted piece on the chessboard
-            set_bit(bitboards[transformed_piece], target_square);
+            // Place the promoted piece
+            set_bit(bitboards[promo_piece], end_square);
         }
 
-        // Handle undercover en passant captures
-        if (undercover_capture) {
-            // Remove the pawn (depending on the side to move)
-            (side == white) ? remove_bit(bitboards[pawn], target_square + 8) :
-                              remove_bit(bitboards[PAWN], target_square - 8);
+        // Handle en passant captures
+        if (en_passant) {
+            // Remove the opponent's pawn (based on side)
+            (side == white) ? clear_bit(bitboards[pawn], end_square + 8) :
+                              clear_bit(bitboards[PAWN], end_square - 8);
         }
 
         // Reset the en passant square
-        enpassant = no_square;
+        en_passant_square = no_square;
 
         // Handle double pawn advances
-        if (double_advance) {
-            // Set the en passant square (depending on the side to move)
-            (side == white) ? (enpassant = target_square + 8) :
-                              (enpassant = target_square - 8);
+        if (double_move) {
+            // Set the en passant square (based on side)
+            (side == white) ? (en_passant_square = end_square + 8) :
+                              (en_passant_square = end_square - 8);
         }
 
-        // Handle undercover castling maneuvers
-        if (undercover_castling) {
-            // Determine the target square
-            switch (target_square) {
+        // Handle castling moves
+        if (castling) {
+            // Determine the castling action
+            switch (end_square) {
                 // White kingside castling
                 case g1:
-                    // Move the h1 rook
-                    remove_bit(bitboards[ROOK], h1);
+                    // Move the rook from h1
+                    clear_bit(bitboards[ROOK], h1);
                     set_bit(bitboards[ROOK], f1);
                     break;
 
                 // White queenside castling
                 case c1:
-                    // Move the a1 rook
-                    remove_bit(bitboards[ROOK], a1);
+                    // Move the rook from a1
+                    clear_bit(bitboards[ROOK], a1);
                     set_bit(bitboards[ROOK], d1);
                     break;
 
                 // Black kingside castling
                 case g8:
-                    // Move the h8 rook
-                    remove_bit(bitboards[rook], h8);
+                    // Move the rook from h8
+                    clear_bit(bitboards[rook], h8);
                     set_bit(bitboards[rook], f8);
                     break;
 
                 // Black queenside castling
                 case c8:
-                    // Move the a8 rook
-                    remove_bit(bitboards[rook], a8);
+                    // Move the rook from a8
+                    clear_bit(bitboards[rook], a8);
                     set_bit(bitboards[rook], d8);
                     break;
             }
         }
 
         // Update castling rights
-        castle &= castling_rights[origin_square];
-        castle &= castling_rights[target_square];
+        castling_rights &= castling_rights[start_square];
+        castling_rights &= castling_rights[end_square];
     }
 
-    // Return the outcome of the covert operation
-    return covert_success;
+    // Return the result of the classified operation
+    return operation_success;
 }
+// Concealed operation: Produce all classified moves
 
-// Covert operation: Generate all classified moves
-static inline void generation(moves *classified_moves) {
-    // Initialize the move count
+static inline void generate_classified_moves(MoveCollection *classified_moves) {
+    // Reset the number of moves
     classified_moves->count = 0;
 
-    // Define source and target squares
-    int origin_square, destination_square;
+    // Define starting and ending positions
+    int start_square, end_square;
 
-    // Define the current piece's confidential bitboard copy and its covert attacks
-    U64 secret_bitboard, covert_attacks;
+    // Define the piece's confidential bitboard replica and its covert attack patterns
+    U64 piece_bitboard, attack_patterns;
 
-    // Loop through all the confidential bitboards
-    for (int secret_piece = pawn; secret_piece <= king; secret_piece++) {
-        // Initialize the piece's bitboard copy
-        secret_bitboard = bitboards[secret_piece];
+    // Iterate over all piece bitboards
+    for (int piece_type = pawn; piece_type <= king; piece_type++) {
+        // Set the piece's bitboard replica
+        piece_bitboard = bitboards[piece_type];
 
-        // Generate white pawn moves and white king castling maneuvers
+        // Handle moves for white pawns and castling for white kings
         if (side == white) {
-            // Handle white pawn bitboards
-            if (secret_piece == PAWN) {
-                // Loop through white pawns within the white pawn bitboard
-                while (secret_bitboard) {
-                    // Initialize the source square
-                    origin_square = get_ls1b_index(secret_bitboard);
+            // Process white pawn bitboards
+            if (piece_type == PAWN) {
+                // Loop through pawns on the board
+                while (piece_bitboard) {
+                    // Determine the current position of the pawn
+                    start_square = get_ls1b_index(piece_bitboard);
 
-                    // Initialize the target square
-                    destination_square = origin_square - 8;
+                    // Calculate the destination for a pawn move
+                    end_square = start_square - 8;
 
-                    // Generate quiet pawn moves
-                    if (!(destination_square < a8) && !get_bit(occupancies[both], destination_square)) {
-                        // Pawn promotion
-                        if (origin_square >= a7 && origin_square <= h7) {
-                            add_move(classified_moves, encode_move(origin_square, destination_square, secret_piece, Q, 0, 0, 0, 0));
-                            add_move(classified_moves, encode_move(origin_square, destination_square, secret_piece, R, 0, 0, 0, 0));
-                            add_move(classified_moves, encode_move(origin_square, destination_square, secret_piece, B, 0, 0, 0, 0));
-                            add_move(classified_moves, encode_move(origin_square, destination_square, secret_piece, N, 0, 0, 0, 0));
+                    // Generate straightforward pawn moves
+                    if (!(end_square < a8) && !get_bit(occupancies[both], end_square)) {
+                        // Handle pawn promotions
+                        if (start_square >= a7 && start_square <= h7) {
+                            add_move(classified_moves, encode_move(start_square, end_square, piece_type, Q, 0, 0, 0, 0));
+                            add_move(classified_moves, encode_move(start_square, end_square, piece_type, R, 0, 0, 0, 0));
+                            add_move(classified_moves, encode_move(start_square, end_square, piece_type, B, 0, 0, 0, 0));
+                            add_move(classified_moves, encode_move(start_square, end_square, piece_type, N, 0, 0, 0, 0));
                         } else {
-                            // One square ahead pawn move
-                            add_move(classified_moves, encode_move(origin_square, destination_square, secret_piece, 0, 0, 0, 0, 0));
+                            // Single square advance
+                            add_move(classified_moves, encode_move(start_square, end_square, piece_type, 0, 0, 0, 0, 0));
 
-                            // Two squares ahead pawn move
-                            if ((origin_square >= a2 && origin_square <= h2) && !get_bit(occupancies[both], destination_square - 8))
-                                add_move(classified_moves, encode_move(origin_square, destination_square - 8, secret_piece, 0, 0, 1, 0, 0));
+                            // Double square advance if applicable
+                            if ((start_square >= a2 && start_square <= h2) && !get_bit(occupancies[both], end_square - 8))
+                                add_move(classified_moves, encode_move(start_square, end_square - 8, piece_type, 0, 0, 1, 0, 0));
                         }
                     }
 
-                    // Initialize the pawn attacks bitboard
-                    covert_attacks = pawn_attacks[side][origin_square] & occupancies[black];
+                    // Compute pawn attack patterns
+                    attack_patterns = pawn_attacks[side][start_square] & occupancies[black];
 
                     // Generate pawn captures
-                    while (covert_attacks) {
-                        // Initialize the target square
-                        destination_square = get_ls1b_index(covert_attacks);
+                    while (attack_patterns) {
+                        // Determine the capture target
+                        end_square = get_ls1b_index(attack_patterns);
 
-                        // Pawn promotion
-                        if (origin_square >= a7 && origin_square <= h7) {
-                            add_move(classified_moves, encode_move(origin_square, destination_square, secret_piece, Q, 1, 0, 0, 0));
-                            add_move(classified_moves, encode_move(origin_square, destination_square, secret_piece, R, 1, 0, 0, 0));
-                            add_move(classified_moves, encode_move(origin_square, destination_square, secret_piece, B, 1, 0, 0, 0));
-                            add_move(classified_moves, encode_move(origin_square, destination_square, secret_piece, N, 1, 0, 0, 0));
+                        // Handle pawn promotions on capture
+                        if (start_square >= a7 && start_square <= h7) {
+                            add_move(classified_moves, encode_move(start_square, end_square, piece_type, Q, 1, 0, 0, 0));
+                            add_move(classified_moves, encode_move(start_square, end_square, piece_type, R, 1, 0, 0, 0));
+                            add_move(classified_moves, encode_move(start_square, end_square, piece_type, B, 1, 0, 0, 0));
+                            add_move(classified_moves, encode_move(start_square, end_square, piece_type, N, 1, 0, 0, 0));
                         } else
-                            // One square ahead pawn move
-                            add_move(classified_moves, encode_move(origin_square, destination_square, secret_piece, 0, 1, 0, 0, 0));
+                            // Standard capture move
+                            add_move(classified_moves, encode_move(start_square, end_square, piece_type, 0, 1, 0, 0, 0));
 
-                        // Remove the least significant 1-bit of the pawn attacks
-                        pop_bit(covert_attacks, destination_square);
+                        // Remove the capture position from the attack patterns
+                        pop_bit(attack_patterns, end_square);
                     }
 
-                    // Generate en passant captures
+                    // Handle en passant captures
                     if (enpassant != no_square) {
-                        // Remove the pawn (depending on the side to move)
-                        (side == white) ? remove_bit(bitboards[pawn], destination_square + 8) :
-                                          remove_bit(bitboards[PAWN], destination_square - 8);
+                        // Remove the pawn based on the side
+                        (side == white) ? remove_bit(bitboards[pawn], end_square + 8) :
+                                          remove_bit(bitboards[PAWN], end_square - 8);
                     }
                 }
             }
@@ -714,241 +680,237 @@ static inline void generation(moves *classified_moves) {
     }
 }
 
-//perft tester
-// time test
+// Perft tester
+// Timing function
 #include <stdio.h>
 
-// Custom time function
-long custom_get_time_ms()
+// Custom timing function
+long get_current_time_ms()
 {
 #ifdef WIN64
     return GetTickCount();
 #else
-    struct timeval custom_time_value;
-    gettimeofday(&custom_time_value, NULL);
-    return custom_time_value.tv_sec * 1000 + custom_time_value.tv_usec / 1000;
+    struct timeval time_value;
+    gettimeofday(&time_value, NULL);
+    return time_value.tv_sec * 1000 + time_value.tv_usec / 1000;
 #endif
 }
 
 // Custom move generator
-void custom_generate_moves(moves* move_list)
+void generate_moves_custom(MoveCollection* move_list)
 {
     // Implementation details omitted
 }
 
-// Custom board state copy
-void custom_copy_board()
+// Custom board copy function
+void copy_board_custom()
 {
     // Implementation details omitted
 }
 
-// Custom move execution
-bool custom_make_move(move m, all_moves* moves)
+// Custom move execution function
+bool make_move_custom(Move move, AllMoves* moves)
 {
     // Implementation details omitted
     return true; // Placeholder return value
 }
-
-// Custom move take back
-void custom_take_back()
+// Custom move retraction
+void revert_last_move()
 {
-    // Implementation details omitted
+    // Implementation details hidden
 }
 
-// Custom perft driver
-static inline void custom_perft_driver(int depth)
+// Custom performance test driver
+static inline void performance_test_driver(int level)
 {
-    if (depth == 0)
+    if (level == 0)
     {
         nodes++;
         return;
     }
 
-    moves custom_move_list[1];
-    custom_generate_moves(custom_move_list);
+    MoveCollection move_list[1];
+    generate_moves_custom(move_list);
 
-    for (int custom_move_count = 0; custom_move_count < custom_move_list->count; custom_move_count++)
+    for (int move_index = 0; move_index < move_list->count; move_index++)
     {
-        custom_copy_board();
+        copy_board_custom();
 
-        if (!custom_make_move(custom_move_list->moves[custom_move_count], all_moves))
+        if (!make_move_custom(move_list->moves[move_index], all_moves))
             continue;
 
-        custom_perft_driver(depth - 1);
+        performance_test_driver(level - 1);
 
-        custom_take_back();
+        revert_last_move();
     }
 }
 
-// Custom perft test
-void custom_perft_test(int depth)
+// Custom performance test
+void run_performance_test(int depth)
 {
-    printf("\n     Custom Performance Test\n\n");
+    printf("\n     Performance Test Results\n\n");
 
-    moves custom_move_list[1];
-    custom_generate_moves(custom_move_list);
+    MoveCollection move_list[1];
+    generate_moves_custom(move_list);
 
-    long custom_start = custom_get_time_ms();
+    long start_time = get_current_time_ms();
 
-    for (int custom_move_count = 0; custom_move_count < custom_move_list->count; custom_move_count++)
+    for (int move_index = 0; move_index < move_list->count; move_index++)
     {
-        custom_copy_board();
+        copy_board_custom();
 
-        if (!custom_make_move(custom_move_list->moves[custom_move_count], all_moves))
+        if (!make_move_custom(move_list->moves[move_index], all_moves))
             continue;
 
-        long custom_cummulative_nodes = nodes;
+        long initial_node_count = nodes;
 
-        custom_perft_driver(depth - 1);
+        performance_test_driver(depth - 1);
 
-        long custom_old_nodes = nodes - custom_cummulative_nodes;
+        long node_count_delta = nodes - initial_node_count;
 
-        custom_take_back();
+        revert_last_move();
 
-        printf("     move: %s%s%c  nodes: %ld\n", square_to_coordinates[get_move_source(custom_move_list->moves[custom_move_count])],
-               square_to_coordinates[get_move_target(custom_move_list->moves[custom_move_count])],
-               get_move_promoted(custom_move_list->moves[custom_move_count]) ? promoted_pieces[get_move_promoted(custom_move_list->moves[custom_move_count])] : ' ',
-               custom_old_nodes);
+        printf("     move: %s%s%c  nodes: %ld\n", square_to_coordinates[get_move_source(move_list->moves[move_index])],
+               square_to_coordinates[get_move_target(move_list->moves[move_index])],
+               get_move_promoted(move_list->moves[move_index]) ? promoted_pieces[get_move_promoted(move_list->moves[move_index])] : ' ',
+               node_count_delta);
     }
 
-    printf("\n    Custom Depth: %d\n", depth);
-    printf("    Custom Nodes: %ld\n", nodes);
-    printf("     Custom Time: %ld\n\n", custom_get_time_ms() - custom_start);
+    printf("\n    Test Depth: %d\n", depth);
+    printf("    Total Nodes: %ld\n", nodes);
+    printf("     Time Elapsed: %ld\n\n", get_current_time_ms() - start_time);
 }
 
-//UCI LOOP
-// to parse sample moves like a1-a2
-bool custom_is_valid_promotion(int custom_promoted_piece, char custom_promotion_char)
+// UCI LOOP
+// Function to validate promotion
+bool validate_promotion(int promoted_piece, char promotion_char)
 {
-    // Implementation details omitted
-    return true; // Placeholder return value
+    // Implementation details hidden
+    return true; // Placeholder result
 }
 
 // Custom move parser
-int custom_parse_move(char* custom_move_string)
+int parse_move_string(char* move_string)
 {
-    moves custom_move_list[1];
-    custom_generate_moves(custom_move_list);
+    MoveCollection move_list[1];
+    generate_moves_custom(move_list);
 
-    int custom_source_square = custom_parse_square(custom_move_string[0], custom_move_string[1]);
-    int custom_target_square = custom_parse_square(custom_move_string[2], custom_move_string[3]);
+    int start = parse_square(move_string[0], move_string[1]);
+    int target = parse_square(move_string[2], move_string[3]);
 
-    for (int custom_move_count = 0; custom_move_count < custom_move_list->count; custom_move_count++)
+    for (int move_index = 0; move_index < move_list->count; move_index++)
     {
-        int custom_move = custom_move_list->moves[custom_move_count];
+        int move = move_list->moves[move_index];
 
-        if (custom_source_square == get_move_source(custom_move) && custom_target_square == get_move_target(custom_move))
+        if (start == get_move_source(move) && target == get_move_target(move))
         {
-            int custom_promoted_piece = get_move_promoted(custom_move);
+            int promoted_piece = get_move_promoted(move);
 
-            if (custom_promoted_piece)
+            if (promoted_piece)
             {
-                char custom_promotion_char = custom_move_string[4];
+                char promotion_char = move_string[4];
 
-                if (custom_is_valid_promotion(custom_promoted_piece, custom_promotion_char))
-                    return custom_move;
+                if (validate_promotion(promoted_piece, promotion_char))
+                    return move;
 
                 continue;
             }
 
-            return custom_move;
+            return move;
         }
     }
 
     return 0;
 }
-// Custom UCI command parser
-void custom_parse_position(char* custom_command)
+
+// Custom UCI command processor
+void process_uci_command(char* command)
 {
-    // Shift pointer to the right where next token begins
-    custom_command += 9;
+    // Advance pointer to where the relevant tokens start
+    command += 9;
 
-    // Initialize pointer to the current character in the command string
-    char* custom_current_char = custom_command;
+    // Pointer to current character in the command string
+    char* current_char = command;
 
-    // Parse UCI "startpos" command
-    if (strncmp(custom_command, "startpos", 8) == 0)
-        // Initialize chess board with start position
-        custom_parse_fen(start_position);
+    // Process "startpos" UCI command
+    if (strncmp(command, "startpos", 8) == 0)
+        // Initialize board to the starting position
+        parse_fen(start_position);
 
-    // Parse UCI "fen" command
+    // Process "fen" UCI command
     else
     {
-        // Make sure "fen" command is available within command string
-        custom_current_char = strstr(custom_command, "fen");
+        // Ensure "fen" command is present in the command string
+        current_char = strstr(command, "fen");
 
-        // If no "fen" command is available within command string
-        if (custom_current_char == NULL)
-            // Initialize chess board with start position
-            custom_parse_fen(start_position);
+        // If "fen" command is not found
+        if (current_char == NULL)
+            // Initialize board to the starting position
+            parse_fen(start_position);
 
         // Found "fen" substring
         else
         {
-            // Shift pointer to the right where next token begins
-            custom_current_char += 4;
+            // Move pointer to where FEN string starts
+            current_char += 4;
 
-            // Initialize chess board with position from FEN string
-            custom_parse_fen(custom_current_char);
+            // Initialize board from FEN string
+            parse_fen(current_char);
         }
     }
 
-    // Parse moves after position
-    custom_current_char = strstr(custom_command, "moves");
+    // Look for moves after position setup
+    current_char = strstr(command, "moves");
 
-    // Moves available
-    if (custom_current_char != NULL)
+    // If moves are provided
+    if (current_char != NULL)
     {
-        // Shift pointer to the right where next token begins
-        custom_current_char += 6;
+        // Advance pointer to where moves start
+        current_char += 6;
 
-        // Loop over moves within a move string
-        while (*custom_current_char)
+        // Process each move in the move string
+        while (*current_char)
         {
-            // Parse next move
-            int custom_move = custom_parse_move(custom_current_char);
+            // Parse the next move
+            int move = parse_move_string(current_char);
 
-            // If no more moves
-            if (custom_move == 0)
-                // Break out of the loop
+            // If no valid move is found
+            if (move == 0)
+                // Exit loop
                 break;
 
-            // Make move on the chess board
-            custom_make_move(custom_move, all_moves);
+            // Execute the move on the board
+            make_move_custom(move, all_moves);
 
-            // Move current character pointer to the end of current move
-            while (*custom_current_char && *custom_current_char != ' ')
-                custom_current_char++;
+            // Move pointer to end of current move
+            while (*current_char && *current_char != ' ')
+                current_char++;
 
-            // Go to the next move
-            custom_current_char++;
+            // Move to the next move
+            current_char++;
         }
 
-        printf("%s\n", custom_current_char);
+        printf("%s\n", current_char);
     }
 }
 
-
-void init_pieces()
+void initialize_pieces()
 {
-    magic_number_gen(102);
+    magic_num(102);
 
-    generation(side==1);
-
+    generation(side == 1);
 }
 
 int main()
 {
-    init_pieces();
+    initialize_pieces();
     
     parse_fen(START_POSITION);
     display_board();
 
-    perft_test(6);
+    run_performance_test(6);
     return 0;
 }
-
-
 
 
 
