@@ -265,7 +265,6 @@ U64 define_unique_occupancy(int index, int bits_in_mask, U64 attack_mask)
     return occupancy;
 }
 
-using U64 = uint64_t;
 
 // Set up mysterious constants
 void setup_mysterious_constants()
@@ -407,7 +406,7 @@ void display_threatened_squares(int attacking_side)
 }
 
 // Encode a move
-#define encode_move(src, tgt, piece, promo, capture, double_push, en_passant, castling) \
+#define encoder(src, tgt, piece, promo, capture, dp, ep, cst) \
     (src) |          \
     ((tgt) << 6) |   \
     ((piece) << 12) | \
@@ -418,28 +417,28 @@ void display_threatened_squares(int attacking_side)
     ((castling) << 23)
 
 // Extract the origin square
-#define get_origin(mv) (mv & 0x3F)
+#define orig(mv) (mv & 0x3F)
 
 // Extract the destination square
-#define get_dest(mv) ((mv & 0xFC0) >> 6)
+#define dest(mv) ((mv & 0xFC0) >> 6)
 
 // Extract the piece type
-#define get_piece(mv) ((mv & 0xF000) >> 12)
+#define piece(mv) ((mv & 0xF000) >> 12)
 
 // Extract the promoted piece type
-#define get_promotion(mv) ((mv & 0xF0000) >> 16)
+#define getpromo(mv) ((mv & 0xF0000) >> 16)
 
 // Extract the capture flag
-#define is_capture(mv) (mv & 0x100000)
+#define capt(mv) (mv & 0x100000)
 
 // Extract the double pawn move flag
-#define is_double_push(mv) (mv & 0x200000)
+#define dp(mv) (mv & 0x200000)
 
 // Extract the en passant flag
-#define is_en_passant(mv) (mv & 0x400000)
+#define ep(mv) (mv & 0x400000)
 
 // Extract the castling flag
-#define is_castling(mv) (mv & 0x800000)
+#define cast(mv) (mv & 0x800000)
 
 // Structure for move collection
 struct MoveCollection {
@@ -591,7 +590,6 @@ static inline int perform_classified_operation(int encoded_move, int flag) {
             }
         }
 
-        // Update castling rights
         castling_rights &= castling_rights[start_square];
         castling_rights &= castling_rights[end_square];
     }
