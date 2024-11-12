@@ -11,5 +11,7 @@ The NNUE architecture is a shallow 4 layered fully connected neural network. Che
 Pytorch is used for creating the neural networks and evaluations.
 ### Actual Engine
 An alpha-beta minmax tree is used for evaluating positions 6 to 7 moves forwards to make an optimal move given that your opponent plays the optimal move for the prior  6-7 moves. A move shortlister is also used to determine which moves at each level of the tree are considered for evaluation.
+## Deployment
+AWS SageMaker is used to deploy this model. You can connect it to a chess engine website's endpoint to test it against other chess engines through the provided UCI loop
 ### Resources
 The https://chessprogramming.org is a good resources to learn about most chess programming concepts. https://www.youtube.com/@chessprogramming591 is also a good resource for creating bitbaord based chess engines and I will loosely follow him for my based engine architecture used for my nnue evaluation.
