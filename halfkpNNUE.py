@@ -45,3 +45,8 @@ class HalfKPNetwork(nn.Module):
             features = self.transform(features)
 
         return features, torch.tensor([target], dtype=torch.float32)
+
+
+model = HalfKPNetwork()  # Load or train your model
+model_path = 'model.pth'
+torch.save(model.state_dict(), model_path)
