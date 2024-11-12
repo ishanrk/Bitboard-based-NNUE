@@ -1,0 +1,47 @@
+import sagemaker
+import boto3
+from sagemaker.pytorch import PyTorchModel
+from sagemaker import get_execution_role
+
+# Initialize SageMaker session and get role
+sagemaker_session = sagemaker.Session()
+role = get_execution_role()  # Assumes you are running in a SageMaker notebook or have set the role in your environment
+
+# Define the S3 bucket and model path
+bucket_name = "your-s3-bucket-name"
+model_artifact_path = f"s3://{bucket_name}/model.pth"  # The location where your model will be stored
+
+# Upload the model to S3 (if not already uploaded)
+# This assumes the model.pth file is in the same directory
+s3 = boto3.client('s3')
+s3.upload_file('model.pth', bucket_name, 'model.pth')
+
+# Create a PyTorch model object
+pytorch_model = PyTorchModel(
+    model_data=model_artifact_path,  # Path to the model file in S3
+    role=role,
+    entry_point="inference.py",  # Python script for inference logic
+    framework_version='1.12',  # Version of PyTorch to use
+    py_version='py38',  # Python version
+    instance_type='ml.m5.large',  # Instance type for deployment
+    sagemaker_session=sagemaker_session
+)
+
+# Deploy the model to an endpoint
+predictor = pytorch_model.deploy(
+    initial_instance_count=1,
+    instance_type='ml.m5.large'  # or another instance type
+)
+
+# Use the predictor for inference
+# Example: Assuming input is a tensor of the appropriate shape
+import numpy as np
+input_data = np.zeros(41024)  # Replace this with real input data, size 41024
+input_tensor = torch.tensor(input_data, dtype=torch.float32).unsqueeze(0)  # Batch dimension added
+
+# Make prediction
+prediction = predictor.predict(input_tensor.numpy())  # Call the endpoint for inference
+print("Prediction:", prediction)
+
+# After done, delete the endpoint to avoid unnecessary charges
+predictor.delete_endpoint()
